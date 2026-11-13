@@ -1,0 +1,12 @@
+{
+  "seeds": 16,
+  "workers": 2,
+  "salt": "fr-de-connection",
+  "ramp_bp": [1000, 2500, 5000, 10000],
+  "listing_split_bp": 5000,
+  "switchback_block_days": 2,
+  "feed_cap": {"window": 24, "min": 0, "max": 6},
+  "bootstrap": 400,
+  "ci": 0.95,
+  "guardrail": {"max_domestic_str_drop_pp": 1.0}
+}

@@ -1,0 +1,56 @@
+# SLOs of the content visibility platform, as Prometheus recording and alerting rules.
+#   Availability: 99.9% of feed and search requests answer without a 5xx, over 30 days.
+#   Freshness:    99% of listing events are reflected in visibility within 5 s.
+#   Rollout:      a policy activation reaches its last index write within 60 s.
+# Burn-rate alerts follow the multiwindow pattern: page on a fast burn, ticket on a slow one.
+groups:
+  - name: cvp-slo-recording
+    rules:
+      - record: cvp:requests:rate5m
+        expr: sum(rate(cvp_http_request_seconds_count{route=~"feed|search"}[5m]))
+      - record: cvp:errors:rate5m
+        expr: sum(rate(cvp_http_errors_total{route=~"feed|search"}[5m]))
+      - record: cvp:error_ratio:rate5m
+        expr: cvp:errors:rate5m / clamp_min(cvp:requests:rate5m, 1e-9)
+      - record: cvp:error_ratio:rate1h
+        expr: sum(rate(cvp_http_errors_total{route=~"feed|search"}[1h])) / clamp_min(sum(rate(cvp_http_request_seconds_count{route=~"feed|search"}[1h])), 1e-9)
+      - record: cvp:error_ratio:rate6h
+        expr: sum(rate(cvp_http_errors_total{route=~"feed|search"}[6h])) / clamp_min(sum(rate(cvp_http_request_seconds_count{route=~"feed|search"}[6h])), 1e-9)
+      - record: cvp:fresh_ratio:rate5m
+        expr: sum(rate(cvp_listing_visibility_lag_seconds_bucket{le="5"}[5m])) / clamp_min(sum(rate(cvp_listing_visibility_lag_seconds_count[5m])), 1e-9)
+
+  - name: cvp-slo-alerts
+    rules:
+      - alert: VisibilityAvailabilityFastBurn
+        # 14.4x the 0.1% budget over 1h (and still burning over 5m): 2% of the month's budget in an hour
+        expr: cvp:error_ratio:rate1h > (14.4 * 0.001) and cvp:error_ratio:rate5m > (14.4 * 0.001)
+        labels: {severity: page}
+        annotations:
+          summary: Feed and search are failing fast enough to spend the monthly error budget in two days.
+      - alert: VisibilityAvailabilitySlowBurn
+        expr: cvp:error_ratio:rate6h > (6 * 0.001) and cvp:error_ratio:rate1h > (6 * 0.001)
+        labels: {severity: ticket}
+        annotations:
+          summary: Feed and search error rate will exhaust the monthly budget in five days.
+      - alert: VisibilityStale
+        expr: cvp:fresh_ratio:rate5m < 0.99
+        for: 10m
+        labels: {severity: page}
+        annotations:
+          summary: Fewer than 99% of listing events reach visibility within 5 s; new listings are not showing up.
+      - alert: MaterializerLagGrowing
+        expr: deriv(cvp_consumer_lag_records{topic="listings.v1"}[10m]) > 0 and cvp_consumer_lag_records{topic="listings.v1"} > 10000
+        for: 15m
+        labels: {severity: page}
+        annotations:
+          summary: The materializer is falling behind the listings topic.
+      - alert: PolicyRolloutSlow
+        expr: histogram_quantile(0.99, sum by (le) (rate(cvp_policy_apply_seconds_bucket[1h]))) > 60
+        labels: {severity: ticket}
+        annotations:
+          summary: Policy activations take more than 60 s to reach the index.
+      - alert: PolicyRefused
+        expr: increase(cvp_events_total{topic="refused_policy"}[15m]) > 0
+        labels: {severity: ticket}
+        annotations:
+          summary: An invalid policy reached the topic; the API should have refused it.

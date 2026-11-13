@@ -1,0 +1,93 @@
+{
+  "name": "dev",
+  "categories": 10,
+  "warmup_days": 21,
+  "test_days": 28,
+  "listing_ttl_days": 30,
+  "str_horizon_days": 14,
+  "feed_size": 24,
+  "candidates": 48,
+  "examination_decay": 0.7,
+  "buy_threshold": 3.2,
+  "price_weight": 1.1,
+  "cross_border": {
+    "penalty": 0.9,
+    "penalty_sd": 0.6,
+    "shipping_eur": 4.5,
+    "delay_penalty": 0.15
+  },
+  "markets": [
+    {
+      "code": "FR",
+      "listings_per_day": 1400,
+      "buyers": 4200,
+      "session_rate": 0.32,
+      "supply_mix": [
+        0.18,
+        0.16,
+        0.14,
+        0.12,
+        0.08,
+        0.08,
+        0.07,
+        0.07,
+        0.05,
+        0.05
+      ],
+      "demand_mix": [
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1
+      ],
+      "price_level": 14,
+      "quality_mean": 0.0,
+      "max_weight_grams": 5000,
+      "heavy_categories": [
+        9
+      ]
+    },
+    {
+      "code": "DE",
+      "listings_per_day": 900,
+      "buyers": 5200,
+      "session_rate": 0.3,
+      "supply_mix": [
+        0.02,
+        0.02,
+        0.03,
+        0.03,
+        0.1,
+        0.12,
+        0.16,
+        0.17,
+        0.17,
+        0.18
+      ],
+      "demand_mix": [
+        0.16,
+        0.15,
+        0.14,
+        0.12,
+        0.09,
+        0.08,
+        0.07,
+        0.07,
+        0.06,
+        0.06
+      ],
+      "price_level": 15,
+      "quality_mean": 0.0,
+      "max_weight_grams": 5000,
+      "heavy_categories": [
+        9
+      ]
+    }
+  ]
+}

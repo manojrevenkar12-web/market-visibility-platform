@@ -1,0 +1,44 @@
+{
+ "cpus": 2,
+ "feed_http": {
+  "candidates": 200,
+  "p50_us": 485,
+  "p99_us": 863,
+  "requests": 5000
+ },
+ "feed_merge_us": 0.65075,
+ "go": "go1.24.7",
+ "materialise": {
+  "listings": 1000000,
+  "listings_per_second": 372842.4031905333,
+  "seconds": 2.682098365
+ },
+ "pipeline_backlog": {
+  "events": 200000,
+  "events_per_second": 93484.01303437122,
+  "seconds": 2.139403236
+ },
+ "pipeline_steady": {
+  "events": 25000,
+  "events_per_second": 5000,
+  "lag_p50_ms": 0.09963088878096163,
+  "lag_p99_ms": 0.24987688772160213
+ },
+ "policy_activation": {
+  "catalogue": 200000,
+  "ms_to_last_index_write": 44.328,
+  "partial_updates": 4630
+ },
+ "ramp_step": {
+  "catalogue": 1000000,
+  "from_bp": 2000,
+  "full_recompute_ms": 1456.603,
+  "incremental_ms": 69.603,
+  "index_writes": 7615,
+  "mismatches_after": 0,
+  "recomputed": 12273,
+  "scanned": 124819,
+  "to_bp": 3000
+ },
+ "visible_ns_per_call": 55.09192825
+}

@@ -1,0 +1,118 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: vet, tests (race) and stores
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 2s --health-timeout 2s --health-retries 30
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+    env:
+      CVP_POSTGRES_DSN: postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable
+      CVP_REDIS_ADDR: localhost:6379
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.24"
+      - run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+      - run: go vet ./...
+      - run: go test -race -count=1 ./...
+      - name: reports and README are what the code produces
+        run: go run ./cmd/report -check
+
+  vespa:
+    name: search contract against Vespa
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.24"
+      - name: start Vespa and deploy the application package
+        run: |
+          docker run -d --name vespa -p 8080:8080 -p 19071:19071 vespaengine/vespa:8
+          for i in $(seq 1 90); do curl -sf localhost:19071/state/v1/health && break; sleep 2; done
+          (cd deploy/vespa && zip -r ../../app.zip . >/dev/null)
+          curl -sf --header Content-Type:application/zip --data-binary @app.zip \
+            localhost:19071/application/v2/tenant/default/prepareandactivate
+          for i in $(seq 1 90); do curl -sf localhost:8080/state/v1/health | grep -q '"up"' && break; sleep 2; done
+      - run: go test -count=1 -run TestVespaContract -v ./internal/index/
+        env:
+          CVP_VESPA_URL: http://localhost:8080
+
+  kafka:
+    name: event log contract against Redpanda
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.24"
+      - name: start Redpanda
+        run: |
+          docker run -d --name redpanda -p 9092:9092 docker.redpanda.com/redpandadata/redpanda:v24.2.7 \
+            redpanda start --mode dev-container --smp 1 --kafka-addr PLAINTEXT://0.0.0.0:9092 \
+            --advertise-kafka-addr PLAINTEXT://localhost:9092
+          for i in $(seq 1 60); do docker exec redpanda rpk cluster health | grep -q 'Healthy:.*true' && break; sleep 2; done
+      - working-directory: adapters/kafka
+        run: go mod tidy && go vet ./... && go test -count=1 -v ./...
+        env:
+          CVP_KAFKA_BROKERS: localhost:9092
+
+  slo:
+    name: SLO alert rules
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - run: |
+          docker run --rm -v "$PWD/deploy/prometheus:/rules" --entrypoint promtool prom/prometheus:v2.54.1 \
+            test rules /rules/slo.rules.test.yml
+
+  web:
+    name: dashboard
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+  image:
+    name: container image
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker build -t cvp .
+      - run: |
+          docker run -d -p 8080:8080 --name cvp cvp -demo 2000
+          for i in $(seq 1 30); do curl -sf localhost:8080/healthz && break; sleep 1; done
+          curl -sf "localhost:8080/v1/search?market=FR&q=bag&limit=3"

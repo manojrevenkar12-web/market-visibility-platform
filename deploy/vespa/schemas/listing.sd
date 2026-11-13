@@ -1,0 +1,49 @@
+# A listing as the search channel stores it. visible_<channel> holds the buyer markets that may see the listing on
+# that channel; every query filters on it, and a visibility change is a partial update of these fields only.
+schema listing {
+    document listing {
+        field listing_id type long {
+            indexing: summary | attribute
+        }
+        field title type string {
+            indexing: index | summary
+            index: enable-bm25
+        }
+        field category type string {
+            indexing: summary | attribute
+            attribute: fast-search
+        }
+        field seller type string {
+            indexing: summary | attribute
+            attribute: fast-search
+        }
+        field price_cents type long {
+            indexing: summary | attribute
+        }
+        field created_at type long {
+            indexing: summary | attribute
+        }
+        field visible_search type array<string> {
+            indexing: attribute
+            attribute: fast-search
+        }
+        field visible_feed type array<string> {
+            indexing: attribute
+            attribute: fast-search
+        }
+        field visible_similar type array<string> {
+            indexing: attribute
+            attribute: fast-search
+        }
+    }
+
+    fieldset default {
+        fields: title
+    }
+
+    rank-profile by_terms {
+        first-phase {
+            expression: nativeRank(title) + 0.000000001 * attribute(created_at)
+        }
+    }
+}

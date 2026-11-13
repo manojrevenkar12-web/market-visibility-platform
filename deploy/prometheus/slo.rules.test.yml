@@ -1,0 +1,27 @@
+# promtool test rules deploy/prometheus/slo.rules.test.yml
+rule_files: [slo.rules.yml]
+evaluation_interval: 1m
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'cvp_http_request_seconds_count{route="feed",code="2xx"}'
+        values: '0+1000x120'
+      - series: 'cvp_http_errors_total{route="feed"}'
+        values: '0+100x120'
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: VisibilityAvailabilityFastBurn
+        exp_alerts:
+          - exp_labels: {severity: page}
+            exp_annotations:
+              summary: Feed and search are failing fast enough to spend the monthly error budget in two days.
+  - interval: 1m
+    input_series:
+      - series: 'cvp_http_request_seconds_count{route="feed",code="2xx"}'
+        values: '0+1000x120'
+      - series: 'cvp_http_errors_total{route="feed"}'
+        values: '0+0x120'
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: VisibilityAvailabilityFastBurn
+        exp_alerts: []
